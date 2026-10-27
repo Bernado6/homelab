@@ -1,0 +1,70 @@
+# nginx behind the K3s-bundled Traefik ingress, routed by host name.
+# Walkthrough: docs/06-working-with-the-cluster/16-nginx-ingress.md
+#
+#   kubectl apply -f apps/nginx/nginx.yaml
+#   curl -H "Host: nginx.home.arpa" http://192.168.100.22
+#   # then add "192.168.100.22  nginx.home.arpa" to /etc/hosts and open http://nginx.home.arpa
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+spec:
+  selector:
+    app: nginx
+  ports:
+  - port: 80
+    targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx
+  annotations:
+    # Step 20: cert-manager issues a certificate from the private CA into
+    # the Secret named under tls:, and Traefik serves it on 443.
+    cert-manager.io/cluster-issuer: homelab-ca
+    # Plain HTTP answers with a redirect to HTTPS.
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  tls:
+  - hosts: [nginx.home.arpa]
+    secretName: nginx-tls
+  rules:
+  - host: nginx.home.arpa
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx
+            port:
+              number: 80

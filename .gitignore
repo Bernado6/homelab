@@ -1,0 +1,36 @@
+# --- Secrets and credentials: never commit, even by accident ---------------
+# TLS material (step 20 manual example writes tls.crt / tls.key into cwd)
+*.key
+*.crt
+*.pem
+*.csr
+*.p12
+*.pfx
+
+# kubeconfigs copied for testing (the real one lives in ~/.kube/)
+kubeconfig*
+*.kubeconfig
+k3s.yaml
+
+# Local env files and anything explicitly named as a secret
+.env
+.env.*
+*secret*.yaml
+*secrets*.yaml
+
+# Helm: downloaded chart archives and rendered output
+*.tgz
+charts/
+
+# --- Noise -------------------------------------------------------------------
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+
+# Screenshots and photos stay out unless added deliberately with `git add -f`
+*.png
+*.jpg
+*.jpeg
+*.heic

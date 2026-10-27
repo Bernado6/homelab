@@ -90,4 +90,4 @@ Browser ──► <SERVER_IP>:80 ──► Traefik (Ingress controller)
 
 ---
 
-[◀ Previous: Installing Kubernetes (K3s)](12-installing-k3s.md) · [🏠 Home](../../README.md) · [Next: Troubleshooting ▶](../troubleshooting.md)
+[◀ Previous: Installing Kubernetes (K3s)](12-installing-k3s.md) · [🏠 Home](../../README.md) · [Next: A Fixed IP for the Server ▶](../05-networking/14-dhcp-reservation.md)

@@ -1,0 +1,16 @@
+# Traefik middleware: answer plain HTTP with a 308 redirect to HTTPS.
+# Attach to an Ingress with the annotation
+#   traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+# (format: <namespace>-<name>@kubernetescrd; this one lives in `default`).
+#
+# K3s v1.36 bundles Traefik 3, whose CRDs use apiVersion traefik.io/v1alpha1.
+# On an older K3s with Traefik 2 the apiVersion is traefik.containo.us/v1alpha1.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-https
+  namespace: default
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true

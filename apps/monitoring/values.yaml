@@ -1,0 +1,109 @@
+# kube-prometheus-stack values for a single-node, 8GB K3s box.
+# Walkthrough: docs/08-observability/18-prometheus-grafana.md
+#
+#   helm install monitoring prometheus-community/kube-prometheus-stack \
+#     -n monitoring -f apps/monitoring/values.yaml
+#
+# Budget (memory limits): Prometheus 1Gi, Grafana 512Mi, operator 256Mi,
+# kube-state-metrics 128Mi, node-exporter 64Mi  ->  under 2Gi worst case,
+# typically ~800Mi in use.
+
+# Alertmanager needs a notification channel to be useful. Prometheus still
+# evaluates alert rules and shows them in its own UI, so skip it for now.
+alertmanager:
+  enabled: false
+
+# K3s runs these inside the single k3s binary and does not expose their
+# metrics ports. Left enabled, they show as permanently DOWN targets.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false # K3s uses SQLite by default; there is no etcd to scrape
+
+prometheusOperator:
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts: [prometheus.home.arpa]
+    paths: ["/"]
+    pathType: Prefix
+    # Step 20: TLS from the private CA, HTTP redirected to HTTPS.
+    annotations:
+      cert-manager.io/cluster-issuer: homelab-ca
+      traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+    tls:
+      - hosts: [prometheus.home.arpa]
+        secretName: prometheus-tls
+  prometheusSpec:
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    retention: 7d
+    retentionSize: 8GB
+    resources:
+      requests: { cpu: 100m, memory: 512Mi }
+      limits: { memory: 1Gi }
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+    # Pick up ServiceMonitors and PodMonitors from any namespace, not only
+    # the ones carrying this release's label. Needed for step 19 (Traefik).
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+
+grafana:
+  admin:
+    existingSecret: grafana-admin # created by hand, never committed
+    userKey: admin-user
+    passwordKey: admin-password
+  persistence:
+    enabled: true
+    storageClassName: local-path
+    size: 2Gi
+  # A ReadWriteOnce volume can only be mounted by one pod. Recreate stops
+  # the old pod before starting the new one, so upgrades don't deadlock.
+  deploymentStrategy:
+    type: Recreate
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts: [grafana.home.arpa]
+    path: /
+    # Step 20: TLS from the private CA, HTTP redirected to HTTPS.
+    annotations:
+      cert-manager.io/cluster-issuer: homelab-ca
+      traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+    tls:
+      - hosts: [grafana.home.arpa]
+        secretName: grafana-tls
+  grafana.ini:
+    server:
+      root_url: https://grafana.home.arpa
+  # 256Mi was OOMKilled at startup while provisioning ~30 bundled dashboards
+  # (observed 387Mi). 512Mi gives headroom; steady state is ~200Mi.
+  resources:
+    requests: { cpu: 100m, memory: 192Mi }
+    limits: { memory: 512Mi }
+
+kube-state-metrics:
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { memory: 128Mi }
+
+prometheus-node-exporter:
+  resources:
+    requests: { cpu: 20m, memory: 32Mi }
+    limits: { memory: 64Mi }

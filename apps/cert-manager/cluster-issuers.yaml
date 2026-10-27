@@ -1,0 +1,46 @@
+# Private certificate authority for *.home.arpa, run by cert-manager.
+# Walkthrough: docs/09-tls/20-https-with-cert-manager.md
+#
+# Chain:  selfsigned-bootstrap (issuer)
+#           -> homelab-root-ca (Certificate, isCA) -> Secret homelab-root-ca
+#               -> homelab-ca (ClusterIssuer) -> signs every Ingress certificate
+#
+#   kubectl apply -f apps/cert-manager/cluster-issuers.yaml
+---
+# 1. A throwaway issuer that can only self-sign. Used once, to mint the root.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+spec:
+  selfSigned: {}
+---
+# 2. The root CA certificate itself. Lives in the cert-manager namespace.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: homelab-root-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: Homelab Root CA
+  subject:
+    organizations: [homelab]
+  duration: 87600h # 10 years
+  renewBefore: 8760h # renew a year before expiry
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: homelab-root-ca
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+---
+# 3. The issuer every Ingress references. Signs with the root above.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: homelab-ca
+spec:
+  ca:
+    secretName: homelab-root-ca
