@@ -89,6 +89,21 @@ Read the steps in order if you're starting from scratch. Every page has **Previo
 |---|---|---|
 | 20 | [HTTPS Everywhere With cert-manager](docs/09-tls/20-https-with-cert-manager.md) | Install cert-manager, run a private CA in the cluster, trust it once on the laptop, three lines per Ingress |
 
+### Phase 10: DNS
+*Every device at home resolves the homelab's names.*
+
+| # | Step | What you'll do |
+|---|---|---|
+| 21 | [Local DNS for the Whole House (AdGuard Home)](docs/10-dns/21-local-dns-adguard.md) | AdGuard Home on the cluster, one wildcard rewrite, router points at it, hosts files deleted. Why AdGuard over Pi-hole and friends |
+
+### Phase 11: Public access
+*The portfolio reachable from anywhere, no open ports.*
+
+| # | Step | What you'll do |
+|---|---|---|
+| 22 | [Buying a Domain and Setting Up Cloudflare](docs/11-public-access/22-domain-and-cloudflare.md) | Registry vs registrar vs DNS host, choosing a TLD on purpose, what Cloudflare is and why, register, lock down, prepare Zero Trust |
+| 23 | [Public Access With Cloudflare Tunnel](docs/11-public-access/23-cloudflare-tunnel.md) | Outbound-only tunnel to Cloudflare, public hostname to the portfolio Service, admin UIs stay private |
+
 ### Reference
 
 - [Daily Checklist](docs/daily-checklist.md): run this before any step. Point kubectl at the homelab, check health, check the sites, sync the repo
@@ -106,6 +121,8 @@ Read the steps in order if you're starting from scratch. Every page has **Previo
 | Storage | 256GB NVMe SSD |
 | Network | Gigabit Ethernet (wired to router), fixed IP via DHCP reservation |
 | Router | Huawei EchoLife HG8145V5 (Safaricom Home Fibre) |
+| Local DNS | AdGuard Home on the cluster, `*.home.arpa` wildcard |
+| Public access | Cloudflare Tunnel, portfolio at `https://benardkipngeno.com`, no open ports |
 | Display (install only) | Lenovo ThinkVision monitor + USB keyboard |
 | OS | Ubuntu Server 26.04.1 LTS |
 | Kubernetes | K3s v1.36.5+k3s1 |
@@ -128,7 +145,15 @@ Read the steps in order if you're starting from scratch. Every page has **Previo
 - [x] Portfolio site (`portfolio.home.arpa`, image from GHCR)
 - [x] Prometheus + Grafana (lightweight, with limits)
 - [x] HTTPS with cert-manager (private CA for `*.home.arpa`)
-- [ ] Backups (external drive / cloud)
+- [x] Local DNS for every device (AdGuard Home, `*.home.arpa` wildcard)
+- [x] Buy a domain, DNS on Cloudflare (`benardkipngeno.com`)
+- [x] Public portfolio via Cloudflare Tunnel (`https://benardkipngeno.com`)
+- [ ] CKAD practice lab on the real cluster
+- [ ] Alertmanager with notifications
+
+**Parked until there's budget** (in this order, because backups must exist before the storage apps hold real data):
+
+- [ ] Backups (USB drive first, cloud bucket second)
 - [ ] RAM upgrade → 24GB+
 - [ ] 1TB SSD for app data
 - [ ] Paperless-ngx
@@ -166,6 +191,8 @@ docs/
   07-workloads/            ← step 17: portfolio site from GHCR (manifests live in the app repo)
   08-observability/        ← steps 18–19: Prometheus + Grafana, using the metrics
   09-tls/                  ← step 20: cert-manager and a private CA
+  10-dns/                  ← step 21: AdGuard Home, wildcard DNS for the house
+  11-public-access/        ← steps 22–23: buying a domain + Cloudflare, then the tunnel
   daily-checklist.md
   troubleshooting.md
   lessons-learned.md
@@ -174,6 +201,8 @@ apps/                      ← manifests and values referenced in the guide
   nginx/nginx.yaml         ← step 16: nginx behind a host-based Ingress (TLS added in 20)
   monitoring/values.yaml   ← step 18: kube-prometheus-stack values for 8GB (TLS added in 20)
   cert-manager/            ← step 20: CA issuers and the HTTPS redirect middleware
+  adguard/                 ← step 21: AdGuard Home, DNS on the node IP via ServiceLB
+  cloudflared/             ← step 23: tunnel pods, token from a Secret
 ```
 
 ---

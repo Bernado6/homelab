@@ -47,9 +47,12 @@ kubectl get events -A --sort-by=.lastTimestamp | tail -15
 curl -s -o /dev/null -w 'portfolio  %{http_code}\n' http://portfolio.home.arpa/healthz
 curl -s -o /dev/null -w 'grafana    %{http_code}\n' http://grafana.home.arpa/api/health
 curl -s -o /dev/null -w 'prometheus %{http_code}\n' http://prometheus.home.arpa/-/ready
+curl -s -o /dev/null -w 'adguard    %{http_code}\n' http://adguard.home.arpa/login.html
+curl -s -o /dev/null -w 'public     %{http_code}\n' https://benardkipngeno.com
+dig +short github.com | head -1
 ```
 
-Three `200`s. A connection error on all three usually means the laptop's `/etc/hosts` is fine but the server is down or has changed IP; `ping 192.168.100.22` tells you which.
+Five `200`s and a public IP. The `public` line goes out through Cloudflare and back in through the tunnel, so it checks the tunnel pods, the route, and the portfolio in one request. Since step 21 every name goes through AdGuard, so a failure on **all** of them points at DNS first: `dig @192.168.100.22 portfolio.home.arpa` tells you whether AdGuard is answering, and `ping 192.168.100.22` whether the server is up at all. The last line proves ordinary internet names still resolve through it.
 
 ## 4. Is the repo in sync?
 

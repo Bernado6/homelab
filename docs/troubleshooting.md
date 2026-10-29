@@ -26,7 +26,11 @@ Problems I hit along the way, and what fixed them. Ordered roughly by when they 
 | `strict decoding error: unknown field "spec.rules"` (or `spec.tls`, `spec.ingressClassName`) on apply | Ingress fields pasted into a Deployment, or any snippet pasted into the wrong `kind`. The rejected field names say which kind you meant. | [20](09-tls/20-https-with-cert-manager.md) |
 | Certificate stuck at `READY False` | `kubectl -n <ns> describe certificate <name>`; the Events say why. Usually a typo in the issuer name or a host not in the Ingress `tls.hosts`. | [20](09-tls/20-https-with-cert-manager.md) |
 | Browser trusts the site but `curl` fails the certificate | Homebrew `curl` has its own CA bundle and ignores the macOS keychain. `curl --cacert ~/homelab-root-ca.crt …`, or use `/usr/bin/curl`. | [20](09-tls/20-https-with-cert-manager.md) |
+| `ImagePullBackOff` with `lookup registry-1.docker.io: Try again`, and on the server `dig` says `127.0.0.53#53: connection refused` while `dig @1.1.1.1` works | A `type: LoadBalancer` Service on port 53 made ServiceLB redirect **all** local port-53 traffic, including the node's own stub resolver, into a pod that isn't running, so the node can't resolve the registry to pull that pod's image. Take the node off the stub: `DNSStubListener=no`, fixed upstreams in netplan, symlink `/etc/resolv.conf` to `/run/systemd/resolve/resolv.conf`, restart CoreDNS. Do it **before** creating the Service. | [21](10-dns/21-local-dns-adguard.md) |
+| Shell hangs with a `>` prompt after pasting a `tee … <<'EOF'` block | The closing `EOF` was indented; a heredoc terminator must start at column one. `Ctrl+C`, then paste without indentation, or use `printf … \| sudo tee` instead. | [21](10-dns/21-local-dns-adguard.md) |
+| `netplan apply`: *networkd requires that use-dns has the same value in both dhcp4_overrides and dhcp6_overrides* | Only `dhcp4-overrides` was set. Add `dhcp6-overrides: {use-dns: false}` too. | [21](10-dns/21-local-dns-adguard.md) |
+| `netplan apply`: *expected mapping (check indentation)* pointing at `addresses:[…]` | Missing space after the colon. Fix the line in an editor; the `- item` list form is paste-proof. | [21](10-dns/21-local-dns-adguard.md) |
 
 ---
 
-[◀ Previous: HTTPS Everywhere With cert-manager](09-tls/20-https-with-cert-manager.md) · [🏠 Home](../README.md) · [Next: Lessons Learned ▶](lessons-learned.md)
+[◀ Previous: Public Access With Cloudflare Tunnel](11-public-access/23-cloudflare-tunnel.md) · [🏠 Home](../README.md) · [Next: Lessons Learned ▶](lessons-learned.md)

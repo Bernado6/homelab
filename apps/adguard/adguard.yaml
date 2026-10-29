@@ -1,0 +1,134 @@
+# AdGuard Home: local DNS for the whole house, running on the cluster.
+# Walkthrough: docs/10-dns/21-local-dns-adguard.md
+#
+#   kubectl apply -f apps/adguard/adguard.yaml
+#   kubectl -n dns port-forward deploy/adguard 3000:3000   # first-run wizard, once
+#
+# DNS is exposed on the node's own IP (192.168.100.22:53) by K3s's built-in
+# ServiceLB. The admin UI is behind Traefik at https://adguard.home.arpa.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dns
+---
+# Config (AdGuardHome.yaml) and the query log / stats database both live here.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: adguard-data
+  namespace: dns
+spec:
+  storageClassName: local-path
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adguard
+  namespace: dns
+  labels:
+    app: adguard
+spec:
+  replicas: 1
+  # ReadWriteOnce volume: stop the old pod before starting the new one.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: adguard
+  template:
+    metadata:
+      labels:
+        app: adguard
+    spec:
+      containers:
+      - name: adguard
+        # Pin to a release from https://github.com/AdguardTeam/AdGuardHome/releases
+        image: adguard/adguardhome:v0.107.52
+        ports:
+        - { name: dns-udp, containerPort: 53, protocol: UDP }
+        - { name: dns-tcp, containerPort: 53, protocol: TCP }
+        - { name: http, containerPort: 80 }      # admin UI after the wizard
+        - { name: setup, containerPort: 3000 }   # admin UI before the wizard
+        volumeMounts:
+        - { name: data, mountPath: /opt/adguardhome/work, subPath: work }
+        - { name: data, mountPath: /opt/adguardhome/conf, subPath: conf }
+        # Port 53 only opens AFTER the first-run wizard has been completed.
+        # The startupProbe holds liveness/readiness off for up to 30 minutes
+        # (60 x 30s) so the wizard can run; once 53 answers, the normal
+        # probes take over. On later restarts the saved config opens 53
+        # immediately and the startup window is never used.
+        startupProbe:
+          tcpSocket: { port: 53 }
+          periodSeconds: 30
+          failureThreshold: 60
+        readinessProbe:
+          tcpSocket: { port: 53 }
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket: { port: 53 }
+          periodSeconds: 30
+        resources:
+          requests: { cpu: 20m, memory: 64Mi }
+          limits: { memory: 256Mi }
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: adguard-data
+---
+# DNS on the LAN. type: LoadBalancer makes K3s ServiceLB publish port 53 on
+# the node IP. One Service with both protocols (MixedProtocolLBService).
+apiVersion: v1
+kind: Service
+metadata:
+  name: adguard-dns
+  namespace: dns
+spec:
+  type: LoadBalancer
+  # Keep the real client IP (phone, laptop) instead of the node's bridge
+  # address, so AdGuard's per-client stats mean something. Safe on one node.
+  externalTrafficPolicy: Local
+  selector:
+    app: adguard
+  ports:
+  - { name: dns-udp, port: 53, targetPort: 53, protocol: UDP }
+  - { name: dns-tcp, port: 53, targetPort: 53, protocol: TCP }
+---
+# Admin UI, cluster-internal; Traefik fronts it below.
+apiVersion: v1
+kind: Service
+metadata:
+  name: adguard-web
+  namespace: dns
+spec:
+  selector:
+    app: adguard
+  ports:
+  - { name: http, port: 80, targetPort: 80 }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: adguard
+  namespace: dns
+  annotations:
+    cert-manager.io/cluster-issuer: homelab-ca
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  tls:
+  - hosts: [adguard.home.arpa]
+    secretName: adguard-tls
+  rules:
+  - host: adguard.home.arpa
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: adguard-web
+            port:
+              number: 80
